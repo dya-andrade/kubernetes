@@ -300,9 +300,9 @@ irão conseguir se comunicar, através deste pod com este IP.</p>
 
 <p>Não temos controle sobre a criação dos IPs dos pods, eles são gerados automáticamente</p>
 
-![Screenshot 2023-08-19 at 12.10.49 PM.png](..%2F..%2F..%2Fvar%2Ffolders%2F4n%2Fy8pgs53921j9_1yr_n1vjtpm0000gp%2FT%2FTemporaryItems%2FNSIRD_screencaptureui_QjEcJu%2FScreenshot%202023-08-19%20at%2012.10.49%20PM.png)
+<img width="508" alt="Screenshot 2023-08-20 at 9 59 47 AM" src="https://github.com/MulherMarav/estudo_kubernetes/assets/101612046/9994eb0e-158c-41b6-b57e-2fd9f595828a">
 
-![Screenshot 2023-08-19 at 12.15.15 PM.png](..%2F..%2F..%2Fvar%2Ffolders%2F4n%2Fy8pgs53921j9_1yr_n1vjtpm0000gp%2FT%2FTemporaryItems%2FNSIRD_screencaptureui_ZItVDY%2FScreenshot%202023-08-19%20at%2012.15.15%20PM.png)
+<img width="682" alt="Screenshot 2023-08-20 at 10 00 31 AM" src="https://github.com/MulherMarav/estudo_kubernetes/assets/101612046/6459f94f-4d0b-414f-877a-3729298b2159">
 
 * Comando para exibir os pods formatado, de maneira wide que a saída/output, irá exibir o IP do pod, como: 10.1.0.9
 
@@ -314,7 +314,7 @@ kubectl get pods -o wide
 
 <p>Eles conseguem se comunicar por um recurso do Kubernetes chamado Service/SVC.</p>
 
-![Screenshot 2023-08-19 at 12.25.26 PM.png](..%2F..%2F..%2Fvar%2Ffolders%2F4n%2Fy8pgs53921j9_1yr_n1vjtpm0000gp%2FT%2FTemporaryItems%2FNSIRD_screencaptureui_wlLrBx%2FScreenshot%202023-08-19%20at%2012.25.26%20PM.png)
+<img width="833" alt="Screenshot 2023-08-20 at 10 01 13 AM" src="https://github.com/MulherMarav/estudo_kubernetes/assets/101612046/234caadf-df69-40d8-80b6-456ff770893c">
 
 <p>Cada pod prover de um IP fixo, imutável. É por este IP que os outros pods se comunicam com ele.</p>
 <p>Os serviços sempre vão possuir IPs fixos que nunca vão mudar. Os serviços provem de um DNS para se comunicar com um ou mais pods.</p>
@@ -322,12 +322,11 @@ kubectl get pods -o wide
 <p>Os pods nunca vão se comunicar diretamente com os outros pods, sempre será através do serviço, o serviço irá possuir um IP fixo e um DNS.</p>
 <p>Os serviços também faz balanceamento de carga entre os pods.</p>
 
-![Screenshot 2023-08-19 at 12.30.39 PM.png](..%2F..%2F..%2Fvar%2Ffolders%2F4n%2Fy8pgs53921j9_1yr_n1vjtpm0000gp%2FT%2FTemporaryItems%2FNSIRD_screencaptureui_0nu4Qw%2FScreenshot%202023-08-19%20at%2012.30.39%20PM.png)
+<img width="760" alt="Screenshot 2023-08-20 at 10 01 59 AM" src="https://github.com/MulherMarav/estudo_kubernetes/assets/101612046/602616af-fc29-4be6-a286-3d0aea4767a3">
 
 * Os serviços possuem esses três tipos:
 
-![Screenshot 2023-08-19 at 12.32.25 PM.png](..%2F..%2F..%2Fvar%2Ffolders%2F4n%2Fy8pgs53921j9_1yr_n1vjtpm0000gp%2FT%2FTemporaryItems%2FNSIRD_screencaptureui_cZaJZ5%2FScreenshot%202023-08-19%20at%2012.32.25%20PM.png)
-
+<img width="542" alt="Screenshot 2023-08-20 at 10 02 36 AM" src="https://github.com/MulherMarav/estudo_kubernetes/assets/101612046/a287d1d7-0d8c-4263-b095-81b53329d1da">
 
 ### Criando um serviço ClusterIP
 
@@ -336,12 +335,13 @@ kubectl get pods -o wide
 <p>Nesse cenário que nós estamos visualizando, todo e qualquer pod. Esse de final .2, .4 e .3 eles vão conseguir fazer a comunicação para este pod de final .1 a partir desse serviço, 
 utilizando o IP e o DNS desse serviço.</p>
 
-![Screenshot 2023-08-19 at 1.27.45 PM.png](..%2F..%2F..%2Fvar%2Ffolders%2F4n%2Fy8pgs53921j9_1yr_n1vjtpm0000gp%2FT%2FTemporaryItems%2FNSIRD_screencaptureui_q4ngGD%2FScreenshot%202023-08-19%20at%201.27.45%20PM.png)
+<img width="903" alt="Screenshot 2023-08-20 at 10 03 50 AM" src="https://github.com/MulherMarav/estudo_kubernetes/assets/101612046/1b2ce4a9-41ef-4e4b-9021-9f387a9fe201">
+
 
 <p>O pod com o service não consegue se comunicar com os outros pods, por conta que os outros pods não possuem serviços atrelados a eles.</p>
 <p>Não é possível acessar esse pod fora do ClusterIP, por conta que a comunicação é apenas interna entre os pods pelo ClusterIP.</p>
 
-![img.png](img/img.png)
+<img width="908" alt="Screenshot 2023-08-20 at 10 04 30 AM" src="https://github.com/MulherMarav/estudo_kubernetes/assets/101612046/969adefd-9e92-4094-8194-69a63f9be2ff">
 
 #### ClusterIP na prática
 
@@ -385,9 +385,6 @@ kubectl apply -f .\pod-2.yaml
 
 <p>Em nosso Cluster temos os seguintes pods criados, mas ainda está faltando criarmos o serviço para o pod-2.</p>
 
-![Screenshot 2023-08-19 at 1.54.51 PM.png](..%2F..%2F..%2Fvar%2Ffolders%2F4n%2Fy8pgs53921j9_1yr_n1vjtpm0000gp%2FT%2FTemporaryItems%2FNSIRD_screencaptureui_2LNfmz%2FScreenshot%202023-08-19%20at%201.54.51%20PM.png)
-
-
 * Crie um arquivo de configuração chamado **svc-pod-2.yaml**
 
 ```yaml
@@ -403,7 +400,8 @@ spec:
 
 <p>As labels permitem definir que o serviço irá se comunicar apenas com os pods que tem suas respectivas labels</p>
 
-![Screenshot 2023-08-19 at 7.06.51 PM.png](..%2F..%2F..%2Fvar%2Ffolders%2F4n%2Fy8pgs53921j9_1yr_n1vjtpm0000gp%2FT%2FTemporaryItems%2FNSIRD_screencaptureui_2a9Ctj%2FScreenshot%202023-08-19%20at%207.06.51%20PM.png)
+<img width="875" alt="Screenshot 2023-08-20 at 10 08 45 AM" src="https://github.com/MulherMarav/estudo_kubernetes/assets/101612046/826d7a4f-60ed-4285-b80f-96b72db0c8e9">
+
 
 <p>Podemos colocar quantas labels quisermos, com qualquer nome.</p>
 
