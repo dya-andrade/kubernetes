@@ -467,7 +467,7 @@ kubectl exec -it news-portal -- bash
 * Com IP do pod-2 e a porta 80
 
 ````shell
-curl 10.244.0.15:80
+root@pod-1:/var/www/html# curl 10.244.0.15:80
 ````
 
 * Se deletarmos o pod-2, o serviço irá permanecer em execução
@@ -506,7 +506,7 @@ spec:
 <p>Após aplicar as novas configurações do pod-2 e do service, devemos usar a porta <b>900</b> para fazer um curl para o serviço.</p>
 
 ````shell
-curl 10.108.136.109:9000
+root@pod-1:/var/www/html# curl 10.108.136.109:9000
 ````
 
 10.244.0.15:80 -> Comunicação através do pod, é instável.
@@ -574,12 +574,30 @@ spec:
 kubectl apply -f .\pod-1.yaml
 ````
 
+````shell
+
+~ % kubectl get pods -o wide
+NAME          READY   STATUS    RESTARTS      AGE   IP            NODE       NOMINATED NODE   READINESS GATES
+news-portal   1/1     Running   1 (17h ago)   27h   10.244.0.19   minikube   <none>           <none>
+nginx-pod     1/1     Running   4 (17h ago)   25d   10.244.0.17   minikube   <none>           <none>
+pod-1         1/1     Running   1 (17h ago)   23h   10.244.0.18   minikube   <none>           <none>
+pod-2         1/1     Running   1 (17h ago)   23h   10.244.0.20   minikube   <none>           <none>
+````
+
 #### Fazer acesso ao pod dentro do Cluster pelo ClusterIP
 
 * Consulte os serviços 
 
 ````shell
 kubectl get svc
+````
+
+````shell
+~ % kubectl get svc
+NAME         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+kubernetes   ClusterIP   10.96.0.1        <none>        443/TCP        26d
+svc-pod-1    NodePort    10.97.146.102    <none>        80:30363/TCP   6s
+svc-pod-2    ClusterIP   10.108.136.109   <none>        9000/TCP       17h
 ````
 
 <p>É possível ver que foi feito um bound da porta 80 para porta 30363 do serviço <b>svc-pod-1</b></p>
@@ -593,7 +611,7 @@ kubectl exec -it news-portal -- bash
 * Faça um **curl** pelo terminal do **news-portal**
 
 ````shell
-curl 10.104.108.232:80
+root@news-portal:/var/www/html# curl 10.97.146.102:80
 ````
 
 <p>O Serviço possui dois IPs, um para comunicação interna pelo <b>clusterIP</b> e outro para comunicação external pelo <b>externalIP</b>.</p>
@@ -604,6 +622,12 @@ curl 10.104.108.232:80
 
 ````shell
 kubectl get nodes -o wide
+````
+
+````shell
+~ % kubectl get nodes -o wide
+NAME       STATUS   ROLES           AGE   VERSION   INTERNAL-IP    EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION   CONTAINER-RUNTIME
+minikube   Ready    control-plane   26d   v1.27.3   192.168.49.2   <none>        Ubuntu 22.04.2 LTS   6.1.32-0-virt    docker://24.0.4
 ````
 
 <p>O Docker Desktop no Windows ele faz um bound automaticamente do Docker Desktop para o nosso LocalHost, então o IP desse nó no Windows 
@@ -652,9 +676,19 @@ kubectl apply -f .\svc-pod-1.yaml
 kubectl get svc
 ````
 
+````shell
+~ % kubectl get svc
+NAME         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+kubernetes   ClusterIP   10.96.0.1        <none>        443/TCP        26d
+svc-pod-1    NodePort    10.97.146.102    <none>        80:30000/TCP   7m39s
+svc-pod-2    ClusterIP   10.108.136.109   <none>        9000/TCP       18h
+````
+
 <p>Agora é possível acessar o pod-2 pela porta 30000</p>
 
 `localhost:30000`
+
+#### Linux
 
 <p>No Linux ele não faz o bound automaticamente para LocalHost, então após consultar os nodes com wide, no linux, 
 pegamos o IP internal do node e utilizamos ele pra acessar de forma externa.</p>
@@ -663,7 +697,130 @@ pegamos o IP internal do node e utilizamos ele pra acessar de forma externa.</p>
 kubectl get nodes -o wide
 ````
 
-`192.168.99.106:30000`
+````shell
+~ % kubectl get nodes -o wide
+NAME       STATUS   ROLES           AGE   VERSION   INTERNAL-IP    EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION   CONTAINER-RUNTIME
+minikube   Ready    control-plane   26d   v1.27.3   192.168.49.2   <none>        Ubuntu 22.04.2 LTS   6.1.32-0-virt    docker://24.0.4
+````
+
+`http://192.168.49.2:30000/`
 
 <p>Então LocalHost não vai funcionar no Linux, nós temos que usar o internal IP no Linux. Enquanto no Windows, todo o acesso vai ser via LocalHost porque ele vai bind direto. 
 A única diferença vai ser essa, o comportamento do resto todo é o mesmo.</p>
+
+#### MacOs
+
+<p>No caso do Windows, o Docker Desktop faz um bind automaticamente do Docker para o localhost, então você pode acessar o serviço utilizando o localhost na 
+porta especificada pelo NodePort. Já no macOS, você precisa descobrir o IP interno do seu nó e utilizar esse IP para acessar o serviço na porta especificada pelo NodePort.</p>
+
+<p>No exemplo da aula, foi utilizado o comando <b>kubectl get nodes -o wide</b> para obter o IP interno do nó. No caso do macOS, você pode tentar utilizar o 
+comando <b>docker-machine ip default</b> para obter o IP do seu nó.</p>
+
+<p>Por exemplo, se o IP do seu nó for 192.168.99.106 e o NodePort definido para o serviço for 30000, você pode acessar a aplicação no navegador 
+utilizando o IP do nó e a porta 30000, da seguinte forma: <b>192.168.99.106:30000</b>.</p>
+
+* Duas formas de descobrir o IP do nó minikube
+
+````shell
+docker inspect minikube
+kubectl describe node minikube
+````
+
+````shell
+Addresses:
+  InternalIP:  192.168.49.2
+````
+
+### Criando um serviço Load Balancer
+
+<p>O LoadBalancer nada mais é do que um ClusterIP que permite a comunicação entre uma mna do mundo externo e os nosso pods. 
+Só que ele automaticamente se integra ao LoadBalancerdo nosso cloud provider.</p>
+
+<p>Então quando nós criamos um LoadBalancer ele vai utilizar automaticamente, sem nenhum esforço manual, o cloud provider da 
+AWS ou do Google Cloud Platform, ou da Azure, e assim por diante.</p>
+
+![Screenshot 2023-08-20 at 1.22.42 PM.png](img%2FScreenshot%202023-08-20%20at%201.22.42%20PM.png)
+
+* Então no Google Cloud Platform, após criarmos o nosso Cluster-1
+
+![Screenshot 2023-08-20 at 1.26.43 PM.png](img%2FScreenshot%202023-08-20%20at%201.26.43%20PM.png)
+
+* No terminal do provider o **cloudshell** iremos digitar o seguindo comando pra criar o **pod-1**
+
+````shell
+cat > pod-1.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-1
+  labels:
+    app: primeiro-pod
+spec:
+    containers:
+        - name: container-pod-1
+          image: nginx:latest
+    ports:
+        - containerPort: 80
+````
+
+* E depois aplique as modificações pelo mesmo terminal do **cloudshell**
+
+````shell
+kubectl apply -f pod-1.yaml
+````
+
+* Agora, crie um serviço do tipo Load Balancer chamado svc-pod-1-loadbalancer
+
+````yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-pod-1-loadbalancer
+spec:
+    type: LoadBalancer
+    ports:
+        - port: 80
+          nodePort: 30000
+    selector:
+        app: primeiro-pod
+````
+
+* No terminal do **Google Cloud Platform**, no **cloudshell**, digite o comando a seguir para aplicar as modificações
+
+````shell
+cat > lb.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+name: svc-pod-1-loadbalancer
+spec:
+type: LoadBalancer
+ports:
+- port: 80
+nodePort: 30000
+selector:
+app: primeiro-pod
+````
+
+* No mesmo terminal choudshell
+
+
+````shell
+kubectl apply -f lb.yaml
+````
+
+* Na aba **Serviços e Entradas** da plataforma **Google Cloud Platform**, podemos ver o svc-pod-1-loadbalancer em execução, criando os endpoints para acesso
+
+![Screenshot 2023-08-20 at 1.40.24 PM.png](img%2FScreenshot%202023-08-20%20at%201.40.24%20PM.png)
+
+* E depois, basta clicarmos no link que foi gerado o do IP, para acessarmos o pod-1 pelo serviço svc-pod-1-loadbalancer
+
+http://35.247.212.255
+
+- Sobre os Load Balancer: 
+
+    - Utilizam automaticamente os balanceadores de carga de cloud providers.
+
+    - Por serem um Load Balancer, também são um NodePort e ClusterIP ao mesmo tempo.
