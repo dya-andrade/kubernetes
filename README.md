@@ -457,7 +457,7 @@ kubectl get service
 kubectl get svc
 ````
 
-* Comando para executar o terminal do pod-1
+* Comando para executar o terminal do **news-portal**
 
 ````shell
 kubectl exec -it news-portal -- bash
@@ -503,7 +503,7 @@ spec:
           targetPort: 80
 ```
 
-<p>Depois de aplicar as novas configurações do pod-2 e do service, devemos usar a porta <b>900</b> para fazer um curl para o serviço.</p>
+<p>Após aplicar as novas configurações do pod-2 e do service, devemos usar a porta <b>900</b> para fazer um curl para o serviço.</p>
 
 ````shell
 curl 10.108.136.109:9000
@@ -514,4 +514,156 @@ curl 10.108.136.109:9000
 
 <p>O serviço irá fazer o bound para o pod no 10.244.0.15:80</p>
 
+### Criando um serviço NodePort
 
+<p>Esse tipo de serviço permite a comunicação externa, para fora do cluster.</p>
+
+![Screenshot 2023-08-20 at 10.19.17 AM.png](img%2FScreenshot%202023-08-20%20at%2010.19.17%20AM.png)
+
+<p>Então, por exemplo, conseguimos acessar um pod que está dentro do nosso cluster, pelo navegador.</p>
+
+<p>O serviço <b>NodePort</b> também é um <b>ClusterIP</b>, então conseguimos se comunicar com o pod internamente pelo serviço e também conseguimos se comunicar externamente pelo serviço.</p>
+
+![Screenshot 2023-08-20 at 10.21.32 AM.png](img%2FScreenshot%202023-08-20%20at%2010.21.32%20AM.png)
+
+* Crie um novo serviço para pod-1 do tipo NodePort
+
+````yaml
+apiVersion: v1
+kind: Service
+metadata:
+    name: svc-pod-1
+spec:
+    type: NodePort
+    ports:
+        - port: 80
+          #targetPort: 80
+    selector:
+      app: primeiro-pod
+````
+
+![Screenshot 2023-08-20 at 10.26.10 AM.png](img%2FScreenshot%202023-08-20%20at%2010.26.10%20AM.png)
+
+
+* Aplique as mudanças do arquivo de configuração para criar um novo serviço do tipo **NodePort**
+
+
+````shell
+kubectl apply -f .\svc-pod-1.yaml
+````
+
+````yaml
+apiVersion: v1
+kind: Pod
+metadata:
+    name: pod-1
+    labels:
+        app: primeiro-pod
+spec:
+    containers:
+        - name: container-pod-1
+          image: nginx:latest
+          ports:
+            - containerPort: 80
+````
+
+* Depois aplique as mudanças do pod-1
+
+
+````shell
+kubectl apply -f .\pod-1.yaml
+````
+
+#### Fazer acesso ao pod dentro do Cluster pelo ClusterIP
+
+* Consulte os serviços 
+
+````shell
+kubectl get svc
+````
+
+<p>É possível ver que foi feito um bound da porta 80 para porta 30363 do serviço <b>svc-pod-1</b></p>
+
+* Execute o terminal do **news-portal** e tente acessar o pod pelo IP e pela porta do serviço **svc-pod-1**
+
+````shell
+kubectl exec -it news-portal -- bash
+````
+
+* Faça um **curl** pelo terminal do **news-portal**
+
+````shell
+curl 10.104.108.232:80
+````
+
+<p>O Serviço possui dois IPs, um para comunicação interna pelo <b>clusterIP</b> e outro para comunicação external pelo <b>externalIP</b>.</p>
+
+<p>O IP externo tem que ser a partir do nó, porque é um node cluster ou node port.</p>
+
+* Use o comando a seguir para ver os nodes, de modo wide para ver os IPs
+
+````shell
+kubectl get nodes -o wide
+````
+
+<p>O Docker Desktop no Windows ele faz um bound automaticamente do Docker Desktop para o nosso LocalHost, então o IP desse nó no Windows 
+vai ser LocalHost.</p>
+
+<p>Se acessarmos, iremos ver que o windows está rodando alguma coisa na porta 80, mas não é nosso pod: </p> 
+
+`localhost:80`
+
+<p>O que nós queremos acessar é a página do Nginx.</p>
+
+<p>Como vimos, a API fez um bound do serviço para a porta <b>30363</b>, então se acessarmos o LocalHost com está porta, teremos acesso ao Html do Nginx</p>
+
+`localhost:30363`
+
+<p>Porém, essa porta é gerada de forma arbitrária, ela vai variar de 30000 até 32767.</p>
+
+#### Como definir a porta externa do NodePort
+
+<p>Onde nós podemos definir qualquer valor de porta no intervalo de 30000 até 32767</p>
+
+````yaml
+apiVersion: v1
+kind: Service
+metadata:
+    name: svc-pod-1
+spec:
+    type: NodePort
+    ports:
+        - port: 80
+          #targetPort: 80
+          nodePort: 30000
+    selector:
+        app: primeiro-pod
+````
+
+* Após definir a porta externa e aplicar as mudanças
+
+````shell
+kubectl apply -f .\svc-pod-1.yaml
+````
+
+* Ao consultar os serviços, iremos ver que a porta mudou para **30000**
+
+````shell
+kubectl get svc
+````
+
+<p>Agora é possível acessar o pod-2 pela porta 30000</p>
+
+`localhost:30000`
+
+<p>No Linux ele não faz o bound automaticamente para LocalHost, então após consultar os nodes com wide, no linux, 
+pegamos o IP internal do node e utilizamos ele pra acessar de forma externa.</p>
+
+````shell
+kubectl get nodes -o wide
+````
+
+`192.168.99.106:30000`
+
+<p>Então LocalHost não vai funcionar no Linux, nós temos que usar o internal IP no Linux. Enquanto no Windows, todo o acesso vai ser via LocalHost porque ele vai bind direto. 
+A única diferença vai ser essa, o comportamento do resto todo é o mesmo.</p>
