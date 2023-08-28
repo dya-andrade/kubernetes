@@ -724,6 +724,7 @@ utilizando o IP do nó e a porta 30000, da seguinte forma: <b>192.168.99.106:300
 ````shell
 docker inspect minikube
 kubectl describe node minikube
+kubectl get nodes -o wide
 ````
 
 ````shell
@@ -824,3 +825,324 @@ http://35.247.212.255
     - Utilizam automaticamente os balanceadores de carga de cloud providers.
 
     - Por serem um Load Balancer, também são um NodePort e ClusterIP ao mesmo tempo.
+
+### Deletar todos services/pods
+
+````sh
+kubectl delete pods --all
+kubectl delete svc --all
+````
+
+### Continuando o projeto
+
+#### Aplicando service ao projeto
+
+* Criar um arquivo para o service do tipo NodePort
+
+````yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-news-portal
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      nodePort: 30000
+  selector:
+    app: news-portal
+````
+
+* Colocar a label e a porta no pod da aplicação 
+
+````yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: news-portal
+  labels:
+    app: news-portal
+spec:
+  containers:
+    - name: news-portal-container
+      image: aluracursos/portal-noticias:1
+      ports:
+      - containerPort: 80
+````
+
+* Aplicar as mudanças dos dois yamls
+
+````sh
+kubectl apply -f .\news-portal.yaml
+````
+
+````sh
+kubectl apply -f .\svc-news-portal.yaml
+````
+
+#### Subindo o sistema de notícias
+
+<p>Iremos criar um serviço e um pod responsáveis no caso pelo sistema de notícias onde 
+será cadastrado. Esse sistema também vai prover para o nosso portal essas notícias para que nós possamos exibir.</p>
+
+<p>Então, como nós queremos acesso do mundo externo ao nosso pod do sistema de notícias e também ao mundo interno do 
+nosso cluster, para que o nosso portal consiga consumir essas notícias, nós precisamos criar um NodePort e um pod no caso - obviamente com a imagem do nosso sistema.</p>
+
+![Screenshot 2023-08-28 at 7.58.07 AM.png](img%2FScreenshot%202023-08-28%20at%207.58.07%20AM.png)
+
+* Crie o novo pod 
+
+````yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: news-system
+  labels:
+    app: news-system
+spec:
+  containers:
+    - name: news-system-container
+      image: aluracursos/sistema-noticias:1
+      ports:
+        - containerPort: 80
+````
+
+* Crie o novo serviço 
+
+````yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-news-system
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      nodePort: 30001
+  selector:
+    app: news-system
+````
+
+* Aplique as alterações
+
+````sh
+kubectl apply -f .\news-system.yaml
+````
+
+````sh
+kubectl apply -f .\svc-news-system.yaml
+````
+
+#### Subindo o banco de dados
+
+<p>Queremos comunicação apenas dentro do cluster. Nós não queremos que o nosso banco seja acessível para o mundo externo, 
+nós podemos criar um *ClusterIP” para ele.</p>
+
+![Screenshot 2023-08-28 at 8.17.02 AM.png](img%2FScreenshot%202023-08-28%20at%208.17.02%20AM.png)
+
+* Crie o novo pod
+
+````yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: news-db
+  labels:
+    app: news-db
+spec:
+  containers:
+    - name: news-db-container
+      image: aluracursos/mysql-db:1
+      ports:
+        - containerPort: 3306
+````
+
+* Crie o novo serviço
+
+````yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-news-db
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3306
+  selector:
+    app: news-db
+````
+
+* Aplique as alterações
+
+````sh
+kubectl apply -f .\news-db.yaml
+````
+
+````sh
+kubectl apply -f .\svc-news-db.yaml
+````
+
+* Consultado os pods e serviços 
+
+````sh
+~ % kubectl get svc                     
+NAME              TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+kubernetes        ClusterIP   10.96.0.1        <none>        443/TCP        6m20s
+svc-news-db       ClusterIP   10.104.13.2      <none>        3306/TCP       117s
+svc-news-portal   NodePort    10.101.187.230   <none>        80:30000/TCP   117s
+svc-news-system   NodePort    10.103.79.65     <none>        80:30001/TCP   117s
+~ % kubectl get pods
+NAME          READY   STATUS             RESTARTS      AGE
+news-db       0/1     CrashLoopBackOff   4 (12s ago)   2m32s
+news-portal   1/1     Running            0             2m32s
+news-system   1/1     Running            0             2m32s
+````
+
+<p>O pod do news-db está com algum erro, e ao consultar o <b>kubectl describe pods news-db</b></p>
+<p>Podemos ver os logs e que ocorreu um erro ao tentar inicializar a aplicação, por conta que não definimos as variáveis 
+de ambiente do banco de dados.</p>
+
+### Aplicar para todos os arquivos
+
+* Para aplicar as mudanças para todos os arquivos dentro do diretório **project**
+
+````sh
+kubectl apply -f project --recursive
+kubectl apply -f project --r
+````
+
+### Variáveis de Ambiente
+
+* Iremos primeiro deletar o pod
+
+````sh
+kubectl delete pod news-db
+````
+
+* Adicionar as envs dentro do yaml do pod
+
+````yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: news-db
+  labels:
+    app: news-db
+spec:
+  containers:
+    - name: news-db-container
+      image: aluracursos/mysql-db:1
+      ports:
+        - containerPort: 3306
+      env:
+        - name: "MYSQL_ROOT_PASSWORD"
+          value: "q1w2e3r4"
+        - name: "MYSQL_DATABASE"
+          value: "empresa"
+        - name: "MYSQL_PASSWORD"
+          value: "q1w2e3r4"
+````
+
+* Iremos recriar o pod, aplicando as alterações
+
+````sh
+kubectl apply -f .\news-db.yaml
+````
+
+* Execute o pod no modo interativo para sabermos se está funcionando
+* E acessar o banco de dados diretamente dentro dele
+
+````sh
+kubectl exec -it news-db -- bash
+````
+
+* Execute o MySql com a senha **q1w2e3r4**
+
+````sh
+root@news-db:/# mysql -u root -p
+````
+
+* Para consultar as databases do MySql
+
+````sh
+mysql> show databases;
+
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| empresa            |
+| mysql              |
+| performance_schema |
++--------------------+
+4 rows in set (0.00 sec)
+````
+
+* Para acessar uma database
+````sh
+mysql> use empresa;
+Reading table information for completion of table and column names
+You can turn off this feature to get a quicker startup with -A
+
+Database changed
+````
+
+* Para consultar as tabelas da database empresa
+
+````sh
+mysql> show tables;
++-------------------+
+| Tables_in_empresa |
++-------------------+
+| noticias          |
+| usuario           |
++-------------------+
+2 rows in set (0.00 sec)
+````
+
+* Fazer uma consulta da tabela **usuario**
+
+````sh
+select * from usuario;
++-----------+-------+-------+
+| idusuario | login | senha |
++-----------+-------+-------+
+|         1 | admin | admin |
++-----------+-------+-------+
+1 row in set (0.00 sec)
+````
+
+<p>O sistema de notícias ainda não sabe qual é o pod do banco de dados, eles ainda não estão vinculados.</p>
+
+* Se acessarmos o sistema 
+
+````sh
+kubectl exec -it news-system -- bash
+````
+
+*  E dar um **ls**, iremos ver que ele possui um arquivo _**bancodedados.php**_
+
+````sh
+root@news-system:/var/www/html# ls
+Dockerfile    bancodedados.php    excluir.php  index.php             noticias.php    php.ini              php.ini-production  theme       uploadClass.php
+arquivos.php  docker-compose.yml  funcoes.php  inserir_noticias.php  notificacao.sh  php.ini-development  sair.php            upload.php  uploads
+````
+
+* Olhando dentro do arquivo _**bancodedados.php**_
+
+````sh
+root@news-system:/var/www/html# cat bancodedados.php
+<?php
+$host = getenv("HOST_DB");
+$usuario = getenv("USER_DB");
+$senha = getenv("PASS_DB");
+$banco = getenv("DATABASE_DB");
+?>
+````
+
+<p>Dando uma olhada dentro desses arquivos nós percebemos que precisamos também definir outras variáveis de ambiente 
+para esse pod.</p>
+
+<p>Estamos misturando variáveis de configuração, trechos de configuração com o nosso conteúdo de imagem no pod <b>news-bd</b>.
+Nós estamos deixando tudo muito acoplado. Seria interessante se nós separássemos isso para mantermos as responsabilidades.</p>
+
