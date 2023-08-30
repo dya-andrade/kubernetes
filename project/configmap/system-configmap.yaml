@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: system-configmap
+data:
+  HOST_DB: svc-news-db:3306 #usando DNS para se referênciar ao pod db
+  USER_DB: root
+  PASS_DB: q1w2e3r4
+  DATABASE_DB: empresa

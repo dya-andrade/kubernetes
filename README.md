@@ -1146,3 +1146,302 @@ para esse pod.</p>
 <p>Estamos misturando variáveis de configuração, trechos de configuração com o nosso conteúdo de imagem no pod <b>news-bd</b>.
 Nós estamos deixando tudo muito acoplado. Seria interessante se nós separássemos isso para mantermos as responsabilidades.</p>
 
+### Config Map
+
+<p>O Kubernetes vai muito além de ser um simples orquestrador de containers e ele já nos provê diversas soluções nativas para diversos problemas.</p>
+
+<p>Nós temos a solução chamada ConfigMap, onde ele vai ser responsável por armazenar essas configurações que foram 
+utilizadas dentro de determinados pods.</p>
+
+<p>Nós podemos guardar dentro deles para não acoplarmos o nosso recurso com informações de configuração, por isso um ConfigMap.</p>
+
+<p>Conseguimos reutilizar configurações definidas dentro de ConfigMaps em diferentes pods. Nós podemos ter pods utilizando 
+diferentes ConfigMaps.</p>
+
+<p>Então isso nos dá um poder de desacoplamento muito grande e de reutilização também.</p>
+
+![Screenshot 2023-08-30 at 7.50.18 AM.png](img%2FScreenshot%202023-08-30%20at%207.50.18%20AM.png)
+
+![Screenshot 2023-08-30 at 7.47.26 AM.png](img%2FScreenshot%202023-08-30%20at%207.47.26%20AM.png)
+
+![Screenshot 2023-08-30 at 7.49.04 AM.png](img%2FScreenshot%202023-08-30%20at%207.49.04%20AM.png)
+
+#### Criando um ConfigMap
+
+* Cria um arquivo de configuração chamado **db-configmap.yaml**
+
+````yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-configmap
+data:
+  MYSQL_ROOT_PASSWORD: q1w2e3r4
+  MYSQL_DATABASE: empresa
+  MYSQL_PASSWORD: q1w2e3r4
+````
+
+* Remova as **_envs_** do arquivo pod **news-db**
+
+````yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: news-db
+  labels:
+    app: news-db
+spec:
+  containers:
+    - name: news-db-container
+      image: aluracursos/mysql-db:1
+      ports:
+        - containerPort: 3306
+````
+
+* Aplique as configurações do **configmap**
+
+````sh
+kubectl apply -f .\db-configmap.yaml
+````
+
+#### Como consultar os ConfigMap
+
+* Para consultar o configmap
+
+````sh
+kubectl get configmap
+````
+
+* Para descrever o configmap
+
+````sh
+kubectl describe configmap db-configmap
+````
+
+### Aplicando ConfigMap no projeto
+
+* Para aplicar as chaves uma por uma
+
+````yaml
+env:
+  - name: MYSQL_ROOT_PASSWORD
+    valueFrom:
+      configMapKeyRef:
+        name: db-configmap
+        key: MYSQL_ROOT_PASSWORD
+````
+
+* Para aplicar todas as chaves de uma vez
+
+````yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: news-db
+  labels:
+    app: news-db
+spec:
+  containers:
+    - name: news-db-container
+      image: aluracursos/mysql-db:1
+      ports:
+        - containerPort: 3306
+      envFrom:
+        - configMapRef:
+            name: db-configmap
+````
+
+* Delete o pod **news-db.yaml**
+
+````shell
+kubectl delete pod news-db
+````
+
+* Aplique as novas declarações no pod
+
+````shell
+kubectl apply -f .\news-db.yaml
+````
+
+* Consulte os pods
+
+````shell
+kubectl get pods
+
+project % kubectl get pods
+NAME          READY   STATUS    RESTARTS      AGE
+news-db       1/1     Running   0             41s
+news-portal   1/1     Running   1 (25h ago)   47h
+news-system   1/1     Running   1 (25h ago)   47h
+````
+
+* Acesse o terminal do pod **news-db**, e consulte os databases
+
+````shell
+kubectl exec -it news-db -- bash
+root@news-db:/# mysql -u root -p
+
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| empresa            |
+| mysql              |
+| performance_schema |
++--------------------+
+4 rows in set (0.00 sec)
+````
+
+* Digite **_exit_** para sair
+
+### Vinculando o banco de dados ao news-system
+
+* Entre no modo interativo do pod **news-system**, ao usar o comando cat, 
+* Iremos visualizar o que tem dentro do arquivo **_bancodedados.php_**
+
+````shell
+project % kubectl exec -it news-system -- bash
+
+root@news-system:/var/www/html# ls
+Dockerfile    bancodedados.php    excluir.php  index.php             noticias.php    php.ini              php.ini-production  theme       uploadClass.php
+arquivos.php  docker-compose.yml  funcoes.php  inserir_noticias.php  notificacao.sh  php.ini-development  sair.php            upload.php  uploads
+
+root@news-system:/var/www/html# cat bancodedados.php
+<?php
+$host = getenv("HOST_DB");
+$usuario = getenv("USER_DB");
+$senha = getenv("PASS_DB");
+$banco = getenv("DATABASE_DB");
+?>
+````
+
+* Precisamos declarar as variáveis **HOST_DB**, **USER_DB**, **PASS_DB** e **DATABASE_DB**
+
+* Para isso, crie um **ConfigMap** para o pod **news-system**
+
+````yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: system-configmap
+data:
+  HOST_DB: svc-news-db:3306 #usando DNS para se referênciar ao pod db
+  USER_DB: root
+  PASS_DB: q1w2e3r4
+  DATABASE_DB: empresa
+````
+
+* Aplique as configurações do **_system-configmap_**
+
+````sh
+kubectl apply -f .\system-configmap.yaml
+````
+
+* Coloca a referência ao **configmap** no pod do **news-system**
+
+````yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: news-system
+  labels:
+    app: news-system
+spec:
+  containers:
+    - name: news-system-container
+      image: aluracursos/sistema-noticias:1
+      ports:
+        - containerPort: 80
+      envFrom:
+        - configMapRef:
+            name: system-configmap
+````
+
+* Delete o pod **news-system.yaml**
+
+````shell
+kubectl delete pod news-system
+````
+
+* Aplique as novas declarações no pod
+
+````shell
+kubectl apply -f .\news-system.yaml
+````
+
+* O **news-portal** precisa saber qual é o IP do **news-system**, ao consultarmos o arquivo **_configuracao.php_**
+
+* Notamos que precisamos definir a variável **_IP_SISTEMA_**
+
+```shell
+project % kubectl exec -it news-portal -- bash
+
+root@news-portal:/var/www/html# ls
+configuracao.php  content.html  docker-compose.yml  index.php  theme
+
+root@news-portal:/var/www/html# cat configuracao.php
+<?php
+$urlnoticias = getenv("IP_SISTEMA");
+?>
+```
+
+* Crie um **ConfigMap** para o **news-portal**
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: portal-configmap
+data:
+  IP_SISTEMA: http://192.168.49.2:30001 #se for windows colocar o localhost ao invés do InternalIP
+```
+
+* Aplique as configurações do **portal-configmap**
+
+```shell
+kubectl apply -f .\portal-configmap.yaml
+```
+
+* Adicione a env no pod news-portal 
+
+````yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: news-portal
+  labels:
+    app: news-portal
+spec:
+  containers:
+    - name: news-portal-container
+      image: aluracursos/portal-noticias:1
+      ports:
+        - containerPort: 80
+      envFrom:
+        - configMapRef:
+            name: portal-configmap
+````
+
+* Delete o pod **news-portal.yaml**
+
+````shell
+kubectl delete pod news-portal
+````
+
+* Aplique as novas declarações no pod
+
+````shell
+kubectl apply -f .\news-portal.yaml
+````
+
+### Como ficou o Cluster do projeto
+
+![Screenshot 2023-08-30 at 9.00.43 AM.png](img%2FScreenshot%202023-08-30%20at%209.00.43%20AM.png)
+
+<p>Caso tivéssemos múltiplos nodes em nosso cluster, tudo funcionaria da mesma maneira, pois as portas mapeadas pelo NodePort 
+são compartilhadas entre os IP's de todos os nodes.</p>
+
+<p>Mais informações podem ser adquiridas em:</p> 
+
+https://kubernetes.io/docs/concepts/services-networking/service/#nodeport
