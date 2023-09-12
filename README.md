@@ -1445,3 +1445,80 @@ são compartilhadas entre os IP's de todos os nodes.</p>
 <p>Mais informações podem ser adquiridas em:</p> 
 
 https://kubernetes.io/docs/concepts/services-networking/service/#nodeport
+
+## Deployments, Volumes e Escalabilidade 
+
+![Screenshot 2023-09-12 at 6.19.24 AM.png](img%2FScreenshot%202023-09-12%20at%206.19.24%20AM.png)
+
+### ReplicaSets
+
+<p>Então, vimos que um Pod é uma estrutura que encapsula um ou mais containers e um ReplicaSet nada mais é que uma estrutura 
+que encapsula, pode encapsular, na verdade, um ou mais Pods.</p>
+
+<p>Ele tem a capacidade de encapsular um ou mais Pods, ou seja, nós não temos a obrigatoriedade de criar um Pod 
+com um ReplicaSet. E que ele também pode gerenciar um ou mais Pods, simultaneamente.</p>
+
+<p>Logo, se, um desses Pods falhar, e ele nunca mais vai voltar, mas o ReplicaSet vai conseguir criar um novo para nós. 
+E isso também vai funcionar para diversos Pods gerenciados por um mesmo ReplicaSet.</p>
+
+<p>Caso algum desses Pods falhe, o que vai acontecer? Nós vamos ter um número de Pods desejados diferentes do número de Pods 
+prontos. Logo, o próprio ReplicaSet vai criar um Pod novo para substituir esse que parou de funcionar.</p>
+
+![Screenshot 2023-09-12 at 6.32.03 AM.png](img%2FScreenshot%202023-09-12%20at%206.32.03%20AM.png)
+
+![Screenshot 2023-09-12 at 6.33.27 AM.png](img%2FScreenshot%202023-09-12%20at%206.33.27%20AM.png)
+
+<p>E por que nós podemos ter diversas réplicas?</p>
+
+<p>Mas, um deles é que enquanto este Pod está voltando a ser executado, para que consigamos acessar nossa aplicação, nós 
+temos outras três formas de acessar esta mesma aplicação, porque nós possuímos cópias dela em execução, então, enquanto 
+essa aqui não volta, nós temos outras três para receber as requisições do nosso usuário.</p>
+
+<p>E, também, caso nós estejamos recebendo muita requisição, nós conseguimos dividir através de um Set que vai fazer o 
+balanceamento de carga, as requisições para esses Pods de maneira bem igual.</p>
+
+* Criei um arquivo para o ReplicaSet como template o pod **news-portal** 
+
+````yaml
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: news-portal-replicaset
+spec:
+  template:
+    metadata:
+      name: news-portal
+      labels:
+        app: news-portal
+    spec:
+      containers:
+        - name: news-portal-container
+          image: aluracursos/portal-noticias:1
+          ports:
+            - containerPort: 80
+          envFrom:
+            - configMapRef:
+                name: portal-configmap
+  replicas: 3
+  selector:
+    matchLabels:
+      app: news-portal
+````
+
+* Aplique as configurações do ReplicaSet
+
+````shell
+kubectl apply -f .\news-portal-replicaset.yaml
+````
+
+* Para consultar os 3 pods criados como réplica do **news-portal**
+
+````shell
+~ replicaset % kubectl get pods
+NAME                           READY   STATUS                       RESTARTS      AGE
+news-db                        1/1     Running                      1 (11d ago)   12d
+news-portal                    0/1     CreateContainerConfigError   0             12d
+news-portal-replicaset-bltzr   0/1     CreateContainerConfigError   0             5s
+news-portal-replicaset-fzmqf   0/1     CreateContainerConfigError   0             5s
+news-system                    1/1     Running                      1 (11d ago)   12d
+````

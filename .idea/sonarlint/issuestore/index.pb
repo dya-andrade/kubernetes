@@ -9,3 +9,11 @@ T
 $services/svc-pod-1-loadbalancer.yaml,9/2/92a618be2589151ed89da847078eefec2de38d15
 G
 services/svc-pod-2.yaml,b/6/b696f14af1f17b33a9adcf4705ebcb06dda79d53
+P
+ project/service/svc-news-db.yaml,9/a/9ae01ae7a364b6f537b9597137a003870a1cd1e1
+T
+$project/service/svc-news-portal.yaml,2/3/23afdd00dca75b9a53a46d0cadf2b66d72dbf9c8
+T
+$project/service/svc-news-system.yaml,1/5/15575851f2be2006ef973bd712636e48ab3f6493
+G
+services/svc-pod-1.yaml,3/4/342d0cc9f3948afa0b6c8b2745b7b5bb8fa8c5db
