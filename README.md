@@ -2,6 +2,20 @@
 
 https://kubernetes.io/pt-br/docs/tutorials/kubernetes-basics/explore/explore-intro/
 
+### Índice
+
+* [Para que serve o Kubernetes](#para-que-serve-o-kubernetes)
+* [Como o Kubernetes funciona](#como-o-kubernetes-funciona)
+* [O que é Nodes](#o-que-é-nodes)
+* [Criando Cluster](#criando-cluster)
+* [Conhecendo os Services](#conhecendo-os-services)
+* [Criando um ClusterIP](#criando-um-serviço-clusterip)
+* [Criando um NodePort](#criando-um-serviço-nodeport)
+* [Criando um Load Balancer](#criando-um-serviço-load-balancer)
+* [Criando um ConfigMap](#criando-um-configmap)
+* [Criando um ReplicaSet](#replicasets)
+* [Criando um Deployment](#deployments)
+
 ### Para que serve o Kubernetes
 
 <p>O kubernetes resolve o problema de escalabilidade horizontal, dividindo o poder computacional das máquinas e trabalhando em paralelo. O Kubernetes 
@@ -1446,7 +1460,7 @@ são compartilhadas entre os IP's de todos os nodes.</p>
 
 https://kubernetes.io/docs/concepts/services-networking/service/#nodeport
 
-## Deployments, Volumes e Escalabilidade 
+### Deployments, Volumes e Escalabilidade 
 
 ![Screenshot 2023-09-12 at 6.19.24 AM.png](img%2FScreenshot%202023-09-12%20at%206.19.24%20AM.png)
 
@@ -1515,10 +1529,427 @@ kubectl apply -f .\news-portal-replicaset.yaml
 
 ````shell
 ~ replicaset % kubectl get pods
-NAME                           READY   STATUS                       RESTARTS      AGE
-news-db                        1/1     Running                      1 (11d ago)   12d
-news-portal                    0/1     CreateContainerConfigError   0             12d
-news-portal-replicaset-bltzr   0/1     CreateContainerConfigError   0             5s
-news-portal-replicaset-fzmqf   0/1     CreateContainerConfigError   0             5s
-news-system                    1/1     Running                      1 (11d ago)   12d
+NAME                           READY   STATUS    RESTARTS      AGE
+news-db                        1/1     Running   2 (40h ago)   15d
+news-portal                    1/1     Running   0             15d
+news-portal-replicaset-bltzr   1/1     Running   0             2d3h
+news-portal-replicaset-fzmqf   1/1     Running   0             2d3h
+news-system                    1/1     Running   2 (40h ago)   15d
 ````
+
+### Deployments
+
+<p>O ReplicaSet nada mais é do que esse conjunto de réplicas que permite a criação,de maneira automática, em caso de falhas 
+de um Pod, dentro de um cluster gerenciado por um ReplicaSet. E nós vamos falar agora sobre o segundo recurso que permite a mesma coisa, que são os Deployments.</p>
+
+<p>Mas, um Deployment nada mais é do que uma camada acima de um ReplicaSet. Então, quando nós definimos um Deployment, nós 
+estamos, automaticamente, definindo um ReplicaSet, sem nenhum mistério.</p>
+
+![Screenshot 2023-09-14 at 3.51.49 PM.png](img%2FScreenshot%202023-09-14%20at%203.51.49%20PM.png)
+
+
+* Criei um serviço deployment chamado **nginx-deployment**
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 3
+  template:
+    metadata:
+      name: nginx-pod
+      labels:
+        app: nginx-pod
+    spec:
+      containers:
+        - name: nginx-container
+          image: nginx:stable
+          ports:
+            - containerPort: 80
+  selector:
+    matchLabels:
+      app: nginx-pod
+```
+
+* A única coisa que muda de um serviço ReplicaSet para um Deployment é o **_kind: Deployment_**
+
+* Aplique as modificações do serviço deployment e consulte os 3 pods **_ReplicaSet_** gerados
+
+```shell
+kubectl apply -f .\nginx-deployment.yaml
+
+~ services % kubectl get pod
+NAME                                READY   STATUS    RESTARTS      AGE
+news-db                             1/1     Running   3 (86s ago)   15d
+news-portal                         1/1     Running   1 (86s ago)   15d
+news-portal-replicaset-bltzr        1/1     Running   1 (86s ago)   2d9h
+news-portal-replicaset-fzmqf        1/1     Running   1 (86s ago)   2d9h
+news-system                         1/1     Running   3 (86s ago)   15d
+nginx-deployment-845547bfdc-8bdvf   1/1     Running   0             9s
+nginx-deployment-845547bfdc-phzkv   1/1     Running   0             9s
+nginx-deployment-845547bfdc-rnbmc   1/1     Running   0             9s
+```
+
+#### Versionamento com Deployments
+
+<p>A grande vantagem do uso de Deployments é que, assim como temos um git, por exemplo, para o nosso controle de versionamento 
+de código, nós temos os Deployments em Kubernetes, que permitem o nosso controle de versionamento das nossas imagens e Pods.</p>
+
+<p>A versão do pod nginx foi alterado para latest, e ao consultar o history antes da alteração tinha apenas uma revisão para fazer, 
+após consultar de novo, após aplicar as alterações no service deployment, o history mudou novamente e agora possui duas revisões pendentes.</p>
+
+```shell
+~ services % kubectl rollout history deployment nginx-deployment
+deployment.apps/nginx-deployment 
+REVISION  CHANGE-CAUSE
+1         <none>
+```
+
+````shell
+~ services % kubectl apply -f \nginx-deployment.yaml --record
+Flag --record has been deprecated, --record will be removed in the future
+deployment.apps/nginx-deployment configured
+````
+
+````shell
+~ services % kubectl rollout history deployment nginx-deployment
+deployment.apps/nginx-deployment 
+REVISION  CHANGE-CAUSE
+1         <none>
+2         kubectl1.27.1 apply --filename=nginx-deployment.yaml --record=true
+````
+
+* Para adicionar uma anotação no **_change-cause_**
+
+````shell
+~ services % kubectl annotate deployment nginx-deployment kubernetes.io/change-cause="definindo a imagem com versão latest" 
+deployment.apps/nginx-deployment annotate
+````
+
+````shell
+~ services % kubectl rollout history deployment nginx-deployment
+deployment.apps/nginx-deployment 
+REVISION  CHANGE-CAUSE
+1         <none>
+2         definindo a imagem com versão latest
+````
+
+* Caso queira ir ou voltar para outra versão das alterações
+
+```shell
+kubectl rollout undo deployment nginx-deployment --to-revision=2
+```
+
+* Os pods atuais serão substituídos pelos pods antigos
+
+```shell
+~ services % kubectl rollout history deployment nginx-deployment             
+deployment.apps/nginx-deployment 
+REVISION  CHANGE-CAUSE
+3         <none>
+4         definindo a imagem com versão 1.0
+5         definindo a imagem com versão latest
+
+~ services % kubectl rollout undo deployment nginx-deployment --to-revision=4
+deployment.apps/nginx-deployment rolled back
+
+~ services % kubectl rollout history deployment nginx-deployment             
+deployment.apps/nginx-deployment 
+REVISION  CHANGE-CAUSE
+3         <none>
+5         definindo a imagem com versão latest
+6         definindo a imagem com versão 1.0
+```
+
+<p>A boa prática, o mais comum é criar os pods através de Deployments, que eles já vão permitir todo esse controle de 
+versionamento e também os benefícios de um ReplicaSet.</p>
+
+<p>Nada impede de criarmos manualmente, como viemos fazendo com Pods e ReplicaSets, mas, o mais comum é fazer a criação 
+através de Deployments, por conta desses benefícios de controle de versionamento e de estabilidade, disponibilidade da nossa aplicação.</p>
+
+### Para consultar ReplicaSet
+
+```shell
+~ services % kubectl get rs
+NAME                          DESIRED   CURRENT   READY   AGE
+news-portal-replicaset        3         3         3       2d9h
+nginx-deployment-845547bfdc   3         3         3       82s
+```
+
+### Para consultar Deployment
+
+```shell
+~ services % kubectl get deployments
+NAME               READY   UP-TO-DATE   AVAILABLE   AGE
+nginx-deployment   3/3     3            3           2m47s
+```
+
+### Aplicando Deployments ao projeto 
+
+![Screenshot 2023-09-14 at 7.08.42 PM.png](img%2FScreenshot%202023-09-14%20at%207.08.42%20PM.png)
+
+* Remover o deployment do **nginx** e o replicaset do **news-portal-replicaset** que foi apenas para teste
+
+* Criar um novo arquivo news-portal-deployment.yaml
+
+````yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: news-portal-deployment
+spec:
+  template:
+    metadata:
+      name: news-portal
+      labels:
+        app: news-portal
+    spec:
+      containers:
+        - name: news-portal-container
+          image: aluracursos/portal-noticias:1
+          ports:
+            - containerPort: 80
+          envFrom:
+            - configMapRef:
+                name: portal-configmap
+  replicas: 3
+  selector:
+    matchLabels:
+      app: news-portal
+````
+
+* Aplique as informações do serviço
+
+````shell
+kubectl apply -f .\news-portal-deployment.yaml
+````
+
+* Consultando os pods e adicionando anotação de revisão da criação do deployment news-portal
+
+````shell
+~ deployment % kubectl get pods
+NAME                                      READY   STATUS    RESTARTS       AGE
+news-db                                   1/1     Running   3 (175m ago)   15d
+news-portal-deployment-59b5fdb95f-5mwm8   1/1     Running   0              90s
+news-portal-deployment-59b5fdb95f-ln9zv   1/1     Running   0              90s
+news-portal-deployment-59b5fdb95f-vrx8r   1/1     Running   0              90s
+news-system                               1/1     Running   3 (175m ago)   15d
+
+~ deployment % kubectl rollout history deployment news-portal-deployment
+deployment.apps/news-portal-deployment 
+REVISION  CHANGE-CAUSE
+1         <none>
+
+~ deployment % kubectl annotate deployment news-portal-deployment kubernetes.io/change-cause="Criando portal de notícias na versão 1"
+deployment.apps/news-portal-deployment annotate
+
+~ deployment % kubectl rollout history deployment news-portal-deployment
+deployment.apps/news-portal-deployment 
+REVISION  CHANGE-CAUSE
+1         Criando portal de notícias na versão 1
+````
+
+* Crie um novo deployment para o pod do **news-system**, e terá apenas um pod
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: news-system-deployment
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: news-system
+      labels:
+        app: news-system
+    spec:
+      containers:
+        - name: news-system-container
+          image: aluracursos/sistema-noticias:1
+          ports:
+            - containerPort: 80
+          envFrom:
+            - configMapRef:
+                name: system-configmap
+  selector:
+    matchLabels:
+      app: news-system
+```
+
+* Delete o pod atual do news-system e depois recrie novamente aplicando as configurações do deployment 
+
+````shell
+~ deployment % kubectl delete pod news-system
+pod "news-system" deleted
+
+
+~ deployment % kubectl apply -f \news-system-deployment.yaml
+deployment.apps/news-system-deployment created
+
+~ deployment % kubectl get pods
+NAME                                      READY   STATUS    RESTARTS        AGE
+news-db                                   1/1     Running   3 (3h10m ago)   15d
+news-portal-deployment-59b5fdb95f-5mwm8   1/1     Running   0               15m
+news-portal-deployment-59b5fdb95f-ln9zv   1/1     Running   0               15m
+news-portal-deployment-59b5fdb95f-vrx8r   1/1     Running   0               15m
+news-system-deployment-568fddf6f7-vrp52   1/1     Running   0               22s
+
+~ deployment % kubectl annotate deployment news-system-deployment kubernetes.io/change-cause="Subindo o sistema na versão 1"
+deployment.apps/news-system-deployment annotate
+````
+
+* Fazer o mesmo passo a passo para **_news-db_**, não precisa colocar **replica** porque será apena um pod
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: news-db-deployment
+spec:
+  template:
+    metadata:
+      name: news-db
+      labels:
+        app: news-db
+    spec:
+      containers:
+        - name: news-db-container
+          image: aluracursos/mysql-db:1
+          ports:
+            - containerPort: 3306
+          envFrom:
+            - configMapRef:
+                name: db-configmap
+  selector:
+    matchLabels:
+      app: news-db
+```
+
+````shell
+~ deployment % kubectl delete pod news-db
+pod "news-db" deleted
+
+~ deployment % kubectl apply -f \news-db-deployment.yaml
+deployment.apps/news-db-deployment created
+
+~ deployment % kubectl get pods
+NAME                                      READY   STATUS    RESTARTS   AGE
+news-db-deployment-866cc444c-r99vr        1/1     Running   0          9s
+news-portal-deployment-59b5fdb95f-5mwm8   1/1     Running   0          22m
+news-portal-deployment-59b5fdb95f-ln9zv   1/1     Running   0          22m
+news-portal-deployment-59b5fdb95f-vrx8r   1/1     Running   0          22m
+news-system-deployment-568fddf6f7-vrp52   1/1     Running   0          6m49s
+
+~ deployment % kubectl annotate deployment news-db-deployment kubernetes.io/change-cause="Subindo o banco de dados na versão 1"
+deployment.apps/news-db-deployment annotate
+````
+
+<p>Os Pods por serem efêmeros eles não tem nenhum dado armazenado neles, porque eles estão prontos para serem armazenados, 
+criados e destruídos.</p>
+
+<p>Como podemos persistir os dados em caso de falhas? Precisamos ter alguma maneira de, caso um container dentro de um 
+Pod reinicie ou o Pod todo reinicie, precisamos ter o acesso às informações que já estavam lá.</p>
+
+### Deletar Deployment
+
+````shell
+kubectl delete deployment nginx-deployment
+kubectl delete -f .\news-portal-replicaset.yaml
+````
+
+### Volumes
+
+<p>Se nós queremos compartilhar arquivos entre containers no Docker, nós fazemos o que? Nós criamos Volumes. No Kubernetes 
+nós fazemos o mesmo, só que a peculiaridade dele é que o ciclo de vida é independente dos containers do Pod, mas é dependente do Pod.</p>
+
+<p>Então, isso quer dizer que se colocarmos algum arquivo dentro desse Volume, e dentro dos containers compartilhando 
+esse Volume e algum desses containers dentro do Pod falhe, mas, o Pod ainda esteja em execução. E caso nós consigamos fazer 
+o reinício manual desse container ou mantenha ele ainda em estado parado, mas tenha outros containers em execução, os arquivos 
+ainda estão persistidos, por mais que este container tenha falhado.</p>
+
+<p>Volume é independente do container e sim dependente do Pod. Isso quer dizer que se esse segundo container aqui falhar, 
+ou seja, todos os containers desse Pod estão falhando, o Pod vai falhar, logo, o volume vai ser removido, porque o ciclo de vida dele é dependente do Pod.</p>
+
+![Screenshot 2023-10-10 at 6.05.28 PM.png](img%2FScreenshot%202023-10-10%20at%206.05.28%20PM.png)
+
+![Screenshot 2023-10-10 at 6.06.41 PM.png](img%2FScreenshot%202023-10-10%20at%206.06.41%20PM.png)
+
+#### HostPath 
+
+<p>O que nós vamos usar para exemplificar a nossa utilização de Volumes é o hostPath. Então, nós fazemos o bind de um diretório 
+do nosso host para um diretório de dentro do nosso container do nosso Pod, nesse caso do Kubernetes.</p>
+
+#### Persistindo Dados com Volumes
+
+````yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-volume
+spec:
+  containers:
+    - name: nginx-container
+      image: nginx:latest
+      volumeMounts:
+        - mountPath: /volume-inside-the-container
+          name: first-volume
+    - name: jenkins-container
+      image: jenkins/jenkins:alpine
+      volumeMounts:
+        - mountPath: /volume-inside-the-container
+          name: first-volume
+  volumes:
+    - name: first-volume
+      hostPath:
+        path: /tmp/volumes
+        type: DirectoryOrCreate
+````
+
+* aplicando o pod-volume.yaml 
+
+```shell
+~ pods % kubectl apply -f \pod-volume.yaml 
+pod/pod-volume created
+
+~ pods % kubectl get pods                  
+NAME                                      READY   STATUS    RESTARTS      AGE
+news-db-deployment-866cc444c-r99vr        1/1     Running   1 (25d ago)   25d
+news-portal-deployment-59b5fdb95f-5mwm8   1/1     Running   1 (25d ago)   25d
+news-portal-deployment-59b5fdb95f-ln9zv   1/1     Running   1 (25d ago)   25d
+news-portal-deployment-59b5fdb95f-vrx8r   1/1     Running   1 (25d ago)   25d
+news-system-deployment-568fddf6f7-vrp52   1/1     Running   1 (25d ago)   25d
+pod-volume                                2/2     Running   0             99s
+```
+
+* compartilhando arquivo entre containers pelo volume
+
+
+```shell
+~ pods % kubectl exec -it pod-volume --container nginx-container -- bash
+
+root@pod-volume:/# ls
+bin  boot  dev  docker-entrypoint.d  docker-entrypoint.sh  etc  home  lib  lib32  lib64  libx32  media  mnt  opt  proc  
+root  run  sbin  srv  sys  tmp  usr  var  volume-inside-the-container
+
+root@pod-volume:/# cd volume-inside-the-container
+
+root@pod-volume:/volume-inside-the-container# touch file.txt
+```
+
+`````shell
+~ pods % kubectl exec -it pod-volume --container jenkins-container -- bash
+pod-volume:/$ ls
+bin  dev  etc  home  lib  media  mnt  opt  proc  root  run  sbin  srv  sys  tmp  usr  var  volume-inside-the-container
+
+pod-volume:/$ cd volume-inside-the-container/
+
+pod-volume:/volume-inside-the-container$ ls
+file.txt
+`````
+
+<p>Então, se eu remover este pod-volume, o volume atrelado a este Pod também foi removido, mas nesse caso, o arquivo, 
+como nós fizemos esse mapeamento para a nossa área de trabalho, persistindo o nosso arquivo para o nosso disco, 
+e esse arquivo vai continuar existindo no disco, mesmo com a remoção do pod-volume.
