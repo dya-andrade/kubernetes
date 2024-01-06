@@ -1952,4 +1952,100 @@ file.txt
 
 <p>Então, se eu remover este pod-volume, o volume atrelado a este Pod também foi removido, mas nesse caso, o arquivo, 
 como nós fizemos esse mapeamento para a nossa área de trabalho, persistindo o nosso arquivo para o nosso disco, 
-e esse arquivo vai continuar existindo no disco, mesmo com a remoção do pod-volume.
+e esse arquivo vai continuar existindo no disco, mesmo com a remoção do pod-volume.</p>
+
+### StatefulSets
+
+<p>Temos um recurso, que é o <b>Persistent Volume</b>, que possui um ciclo de vida independente do nosso pod e vai persistir os dados por mais que o pod falhe</p>
+
+<p>O Stateful Set mantém o estado dos pods, então quer dizer que os arquivos serão mantidos caso o pod reinicia ou falhe.</p>
+
+![Captura de Tela 2024-01-05 às 9.43.49 PM.png](img%2FCaptura%20de%20Tela%202024-01-05%20%C3%A0s%209.43.49%20PM.png)
+
+<p>Quando criamos um pod dentro do Stateful Set, precisamos criar um <b>Persistent Volume Claim (pvc)</b> para acessar um <b>Persistent Volume (pv).</b></p>
+
+![Captura de Tela 2024-01-05 às 9.47.11 PM.png](img%2FCaptura%20de%20Tela%202024-01-05%20%C3%A0s%209.47.11%20PM.png)
+
+![Captura de Tela 2024-01-05 às 9.51.20 PM.png](img%2FCaptura%20de%20Tela%202024-01-05%20%C3%A0s%209.51.20%20PM.png)
+
+<p>Que por mais que nós possamos ter diversos pods num Stateful Set, cada um deles ganha uma identificação única, ordinal.
+E caso, por exemplo, o nosso primeiro pod aqui falhe, vai ser criado um novo pod para substituir a ausência dele.
+Mas, ele vai usar a mesma identificação para o Stateful Set, então, ele vai ser tratado como o mesmo Pod.
+Então, ele vai ter acesso ao mesmo Persistent Volume Claim que vai dar acesso a ele as informações do nosso Persistent Volume.</p>
+
+* criando statefulset, necessário informar o service name
+
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: news-system-statefulset
+spec:
+    replicas: 1
+    template:
+        metadata:
+            labels:
+                app: news-system
+            name: news-system
+        spec:
+            containers:
+                - name: news-system-container
+                  image: aluracursos/sistema-noticias:1
+                  ports:
+                    - containerPort: 8080
+                  envFrom:
+                    - configMapRef:
+                        name: system-configmap
+    selector:
+        matchLabels:
+            app: news-system
+    serviceName: svc-news-system
+```
+
+* aplicando o statefulset
+
+```shell
+kubectl apply -f .\news-system-statefulset.yaml
+```
+
+* consultado o stateful set
+
+```shell
+~ statefulset % kubectl get pods
+NAME                                      READY   STATUS    RESTARTS      AGE
+news-db-deployment-866cc444c-r99vr        1/1     Running   2 (87d ago)   113d
+news-portal-deployment-59b5fdb95f-5mwm8   1/1     Running   2 (87d ago)   113d
+news-portal-deployment-59b5fdb95f-ln9zv   1/1     Running   2 (87d ago)   113d
+news-portal-deployment-59b5fdb95f-vrx8r   1/1     Running   2 (87d ago)   113d
+news-system-deployment-568fddf6f7-vrp52   1/1     Running   2 (87d ago)   113d
+news-system-statefulset-0                 1/1     Running   0             14s
+pod-volume                                2/2     Running   2 (87d ago)   87d
+```
+
+* removendo os deployments, pois não é mais necessário
+
+```shell
+~ statefulset % kubectl get deployments
+NAME                     READY   UP-TO-DATE   AVAILABLE   AGE
+news-db-deployment       1/1     1            1           113d
+news-portal-deployment   3/3     3            3           113d
+news-system-deployment   1/1     1            1           113d
+
+~ statefulset % kubectl delete deployments news-system-deployment
+deployment.apps "news-system-deployment" deleted
+```
+
+<p>O sistema alura notícias deverá funcionar normalmente, mas se deletar o pod e ele ser recriado, o conteudo salvo no site será removido.</p>
+
+```shell
+~ statefulset % kubectl get pv
+No resources found
+
+~ statefulset % kubectl get pvc
+No resources found in default namespace.
+```
+
+<p>É necessário criar o pv e pvc, cada pod precisa do seu para armazenar os dados quando for deletado ou falhar.</p>
+
+
+
