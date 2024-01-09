@@ -25,3 +25,11 @@ G
 0project/statefulset/news-system-statefulset.yaml,5/2/52caf69ec87fd6c30ae9c713c2ed6f21be539768
 9
 	README.md,8/e/8ec9a00bfd09b3190ac6b22251dbb1aa95a0579d
+]
+-.idea/sonarlint/securityhotspotstore/index.pb,8/8/88a9255124c95bdc913197c120a8d560edc59c8e
+S
+#.idea/sonarlint/issuestore/index.pb,9/f/9fe84ebb15faf917b7def6236dba604453cc61e0
+O
+project/volume/session-pvc.yaml,9/3/9386e672b6f3acf72889cbe006892c14c4982fd6
+N
+project/volume/images-pvc.yaml,c/8/c8d0757a8032490e0d6db1916c349e89b71141a4

@@ -2270,9 +2270,7 @@ sem estar pronto para receber requisições.</p>
 
 ![Captura de Tela 2024-01-08 às 8.22.42 PM.png](img%2FCaptura%20de%20Tela%202024-01-08%20%C3%A0s%208.22.42%20PM.png)
 
-<p>É possível configurar o readiness para que o service não envie requisições para o pod que não está pronto.</p>
-<p>Diferença é que o liveness é para o pod e o readiness é para o container.</p>
-
+<p>É possível configurar o readiness para que o service não envie requisições para o container que não está pronto.</p>
 
 * Aplicando o readiness no news-system-statefulset
 
@@ -2341,3 +2339,5 @@ news-portal-deployment-66dc7f4bbf-mhdkd   1/1     Running   0               3m14
 news-portal-deployment-66dc7f4bbf-plzxs   1/1     Running   0               3m11s
 news-system-statefulset-0                 1/1     Running   0               46s
 ```
+
+<p>Além do HTTP, também podemos fazer verificações via TCP.</p>
