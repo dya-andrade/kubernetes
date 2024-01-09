@@ -17,3 +17,11 @@ T
 $project/service/svc-news-system.yaml,1/5/15575851f2be2006ef973bd712636e48ab3f6493
 G
 services/svc-pod-1.yaml,3/4/342d0cc9f3948afa0b6c8b2745b7b5bb8fa8c5db
+^
+.project/deployment/news-portal-deployment.yaml,3/8/38d2830d4ad2ded05ab67ef3e27798df05c4694b
+^
+.project/deployment/news-system-deployment.yaml,4/b/4b24e049877ce745382e2d371d672517c8cc008b
+`
+0project/statefulset/news-system-statefulset.yaml,5/2/52caf69ec87fd6c30ae9c713c2ed6f21be539768
+9
+	README.md,8/e/8ec9a00bfd09b3190ac6b22251dbb1aa95a0579d

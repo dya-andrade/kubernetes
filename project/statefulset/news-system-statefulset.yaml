@@ -18,6 +18,25 @@ spec:
                   envFrom:
                     - configMapRef:
                         name: system-configmap
+                  volumeMounts:
+                    - name: images
+                      mountPath: /var/www/html/uploads
+                    - name: session
+                      mountPath: /tmp
+                  readinessProbe:
+                      httpGet:
+                          path: /
+                          port: 80
+                      periodSeconds: 10
+                      failureThreshold: 5
+                      initialDelaySeconds: 3
+            volumes:
+                - name: images
+                  persistentVolumeClaim:
+                    claimName: images-pvc
+                - name: session
+                  persistentVolumeClaim:
+                    claimName: session-pvc
     selector:
         matchLabels:
             app: news-system

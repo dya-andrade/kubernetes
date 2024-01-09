@@ -15,6 +15,10 @@ https://kubernetes.io/pt-br/docs/tutorials/kubernetes-basics/explore/explore-int
 * [Criando um ConfigMap](#criando-um-configmap)
 * [Criando um ReplicaSet](#replicasets)
 * [Criando um Deployment](#deployments)
+* [Criando um StatefulSet](#statefulsets)
+* [Sobre StorageClass](#storageclass)
+* [Criando Liveness Probes](#liveness-probes)
+* [Criando Readiness Probes](#readiness-probes)
 
 ### Para que serve o Kubernetes
 
@@ -2046,6 +2050,294 @@ No resources found in default namespace.
 ```
 
 <p>É necessário criar o pv e pvc, cada pod precisa do seu para armazenar os dados quando for deletado ou falhar.</p>
+<p>Porque além de não estar salvando os uploads da aplicação, não está sendo salvo a sessão do usuário, sendo necessário autenticar.</p>
+<p>Então, é necessário criar um pvc e um pv tanto para as imagens como para as sessões.</p>
+
+* Criando o pvc para as imagens
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: images-pvc
+spec:
+    accessModes:
+        - ReadWriteOnce
+    resources:
+        requests:
+            storage: 1Gi
+```
+
+* Aplicando o pvc
+
+```shell
+kubectl apply -f .\images-pvc.yaml
+```
+
+* Criando o pvc para as sessões
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: session-pvc
+spec:
+    accessModes:
+        - ReadWriteOnce
+    resources:
+        requests:
+            storage: 1Gi
+```
+
+* Aplicando o pvc
+
+```shell
+kubectl apply -f .\session-pvc.yaml
+```
+
+* Consultando os pvc
+
+```shell
+~ volume % kubectl get pvc
+NAME          STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+images-pvc    Bound    pvc-f5c5a391-777e-4907-bb1c-8f4e6d41abf3   1Gi        RWO            standard       19s
+session-pvc   Bound    pvc-da8fc7ee-0213-4e01-a63b-4482395558cb   1Gi        RWO            standard       7s
+```
+
+* Consultando os pv
+
+```shell
+~ volume % kubectl get pv
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                 STORAGECLASS   REASON   AGE
+pvc-da8fc7ee-0213-4e01-a63b-4482395558cb   1Gi        RWO            Delete           Bound    default/session-pvc   standard                78s
+pvc-f5c5a391-777e-4907-bb1c-8f4e6d41abf3   1Gi        RWO            Delete           Bound    default/images-pvc    standard                90s
+```
+
+* É possível ver que os pvs foram criados automaticamente, apenas declarando os pvcs
+
+### StorageClass
+
+* Temos por padrão no cluster um storage class do tipo standard, ele administra a criação do pv dinamicamente para nós. 
+* Podem criar disco de armazenamento dinamicamente na nuvem, como AWS, Azure, Google Cloud, etc.
+
+```shell
+~ volume % kubectl get sc
+NAME                 PROVISIONER                RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
+standard (default)   k8s.io/minikube-hostpath   Delete          Immediate           false                  167d
+```
+
+* Atualizando o statefulset para usar os pvcs
+
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: news-system-statefulset
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: news-system
+      name: news-system
+    spec:
+      containers:
+        - name: news-system-container
+          image: aluracursos/sistema-noticias:1
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: system-configmap
+          volumeMounts:
+            - name: images
+              mountPath: /var/www/html/uploads
+            - name: session
+              mountPath: /tmp
+      volumes:
+        - name: images
+          persistentVolumeClaim:
+            claimName: images-pvc
+        - name: session
+          persistentVolumeClaim:
+            claimName: session-pvc
+  selector:
+    matchLabels:
+      app: news-system
+  serviceName: svc-news-system
+```
+
+<p>Dando exec dentro do stateful, é possível ver a pasta upload que será usando como caminho do volume images</p>
+
+* Deletando o antigo statefulset e aplicando o novo
+
+```shell
+kubectl delete -f .\news-system-statefulset.yaml
+kubectl apply -f .\news-system-statefulset.yaml
+```
+
+* Consultando o statefulset
+
+```shell
+~ statefulset % kubectl get pods
+NAME                                      READY   STATUS    RESTARTS        AGE
+news-db-deployment-866cc444c-r99vr        1/1     Running   3 (2d20h ago)   115d
+news-portal-deployment-59b5fdb95f-5mwm8   1/1     Running   3 (2d20h ago)   115d
+news-portal-deployment-59b5fdb95f-ln9zv   1/1     Running   3 (2d20h ago)   115d
+news-portal-deployment-59b5fdb95f-vrx8r   1/1     Running   3 (2d20h ago)   115d
+news-system-statefulset-0                 1/1     Running   0               5m34s
+pod-volume                                2/2     Running   4 (2d20h ago)   89d
+```
+
+<p>Se deletarmos o statefulset, ele será criado novamente e será mantido das imagens e as sessões dos usuários. Se der um describe verá que ele fez 
+referência para os pvc que fizeram um bound para pv.</p>
+
+### Liveness Probes
+
+![Captura de Tela 2024-01-08 às 7.37.50 PM.png](img%2FCaptura%20de%20Tela%202024-01-08%20%C3%A0s%207.37.50%20PM.png)
+
+<p>O service ou svc pode balancear as cargas, mas se em algum momento a aplicação/container retornar o status code for 500, por exemplo, 
+o service não saberia lidar, pois o kubelet não tem ciencia do erro.</p>
+<p>Por este motivo é que temos o Liveness, Readiness and Startup Probes.</p>
+
+![Captura de Tela 2024-01-08 às 7.43.51 PM.png](img%2FCaptura%20de%20Tela%202024-01-08%20%C3%A0s%207.43.51%20PM.png)
+
+<p>Se aplicação estiver dando erro, o kubelet saberá atráves do liveness se deve ou não dar restart na aplicação/container.</p>
+<p>O Liveness é configurado dentro do pod da aplicação.</p>
+
+* Configurando o news-system-deployment para usar o liveness
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: news-portal-deployment
+spec:
+  template:
+    metadata:
+      name: news-portal
+      labels:
+        app: news-portal
+    spec:
+      containers:
+        - name: news-portal-container
+          image: aluracursos/portal-noticias:1
+          ports:
+            - containerPort: 80
+          envFrom:
+            - configMapRef:
+                name: portal-configmap
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 10
+            failureThreshold: 3
+            initialDelaySeconds: 20
+  replicas: 3
+  selector:
+    matchLabels:
+      app: news-portal
+```
+
+* Aplicando o liveness
+
+```shell
+kubectl apply -f .\news-system-deployment.yaml
+```
+
+* Consultando o pod
+
+```shell
+~ deployment % kubectl get pods
+NAME                                      READY   STATUS    RESTARTS        AGE
+news-db-deployment-866cc444c-r99vr        1/1     Running   3 (2d21h ago)   116d
+news-portal-deployment-59b5fdb95f-5mwm8   1/1     Running   3 (2d21h ago)   116d
+news-portal-deployment-59b5fdb95f-ln9zv   1/1     Running   3 (2d21h ago)   116d
+news-portal-deployment-59b5fdb95f-vrx8r   1/1     Running   3 (2d21h ago)   116d
+news-system-statefulset-0                 1/1     Running   0               73m
+```
+
+* A mesma configuração pode ser aplicada no sistema de notícias statefulset
+
+### Readiness Probes
+
+<p>se o Pod, todo, tiver falhado, temos a possibilidade de usar Deployments, StatefulSets, ReplicaSets para garantir que este Pod vai voltar 
+à execução.</p>
+
+<p> Mas, o que importa é que enquanto ele volta à execução, mesmo que o Pod já esteja pronto, o container pode ainda está subindo, 
+sem estar pronto para receber requisições.</p> 
+
+![Captura de Tela 2024-01-08 às 8.22.42 PM.png](img%2FCaptura%20de%20Tela%202024-01-08%20%C3%A0s%208.22.42%20PM.png)
+
+<p>É possível configurar o readiness para que o service não envie requisições para o pod que não está pronto.</p>
+<p>Diferença é que o liveness é para o pod e o readiness é para o container.</p>
 
 
+* Aplicando o readiness no news-system-statefulset
 
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: news-system-statefulset
+spec:
+    replicas: 1
+    template:
+        metadata:
+            labels:
+                app: news-system
+            name: news-system
+        spec:
+            containers:
+                - name: news-system-container
+                  image: aluracursos/sistema-noticias:1
+                  ports:
+                    - containerPort: 8080
+                  envFrom:
+                    - configMapRef:
+                        name: system-configmap
+                  volumeMounts:
+                    - name: images
+                      mountPath: /var/www/html/uploads
+                    - name: session
+                      mountPath: /tmp
+                  readinessProbe:
+                      httpGet:
+                          path: /
+                          port: 80
+                      periodSeconds: 10
+                      failureThreshold: 5
+                      initialDelaySeconds: 3
+            volumes:
+                - name: images
+                  persistentVolumeClaim:
+                    claimName: images-pvc
+                - name: session
+                  persistentVolumeClaim:
+                    claimName: session-pvc
+    selector:
+        matchLabels:
+            app: news-system
+    serviceName: svc-news-system
+```
+
+<p>O failureThreshold no readiness serve para dizer quantos tentes serão feitos na aplicação e depois dos teste ele deixará aplicação receber as 
+requisições.</p>
+
+
+```shell
+kubectl apply -f .\news-system-statefulset.yaml
+```
+
+* Consultando os pods, tudo continua funcionando normalmente
+
+```shell
+~ statefulset % kubectl get pods
+NAME                                      READY   STATUS    RESTARTS        AGE
+news-db-deployment-866cc444c-r99vr        1/1     Running   3 (2d22h ago)   116d
+news-portal-deployment-66dc7f4bbf-9j7ks   1/1     Running   0               3m7s
+news-portal-deployment-66dc7f4bbf-mhdkd   1/1     Running   0               3m14s
+news-portal-deployment-66dc7f4bbf-plzxs   1/1     Running   0               3m11s
+news-system-statefulset-0                 1/1     Running   0               46s
+```
