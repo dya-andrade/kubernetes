@@ -19,6 +19,7 @@ https://kubernetes.io/pt-br/docs/tutorials/kubernetes-basics/explore/explore-int
 * [Sobre StorageClass](#storageclass)
 * [Criando Liveness Probes](#liveness-probes)
 * [Criando Readiness Probes](#readiness-probes)
+* [Criando Horizontal Pod Autoscaler](#horizontal-pod-autoscaler)
 
 ### Para que serve o Kubernetes
 
@@ -2510,7 +2511,6 @@ done
 ~                                                                                                                                                                                                                                                                                                                                                                                                                                                           
 ~                                                                                                                                                                                                                                
 -- INSERT --
-
 ```
 * tecla A para editar o arquivo, para salvar e sair ESC e depois :wq
 

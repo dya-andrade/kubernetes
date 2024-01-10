@@ -35,3 +35,11 @@ O
 project/volume/session-pvc.yaml,9/3/9386e672b6f3acf72889cbe006892c14c4982fd6
 D
 project/news-db.yaml,f/1/f133cd3eb392a357d6f837adbaca7c06eeae458e
+H
+project/news-portal.yaml,0/2/027dacc4f8d3e177a0e4136b65eb0444436fa6a2
+N
+project/server/components.yaml,5/8/58354cd1f9f6ed637e8d2ff8371b1891845cf81f
+W
+'project/autoscaler/news-portal-hpa.yaml,4/4/441725e4f8d12206c0646a67a1d85f514710ee8f
+F
+project/test/stress.sh,7/8/788aeeaad74329805e5103f3b1222aff196f05e5
