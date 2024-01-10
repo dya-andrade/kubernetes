@@ -33,3 +33,5 @@ O
 project/volume/session-pvc.yaml,9/3/9386e672b6f3acf72889cbe006892c14c4982fd6
 N
 project/volume/images-pvc.yaml,c/8/c8d0757a8032490e0d6db1916c349e89b71141a4
+D
+project/news-db.yaml,f/1/f133cd3eb392a357d6f837adbaca7c06eeae458e

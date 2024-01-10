@@ -2341,3 +2341,189 @@ news-system-statefulset-0                 1/1     Running   0               46s
 ```
 
 <p>Além do HTTP, também podemos fazer verificações via TCP.</p>
+
+### Horizontal Pod Autoscaler
+
+<p>O Autoscaler desempenha um papel vital na escalabilidade dos pods no Kubernetes. Quando um único pod enfrenta múltiplas requisições, uma falha pode
+resultar em sobrecarga de memória e indisponibilidade até a sua restauração. O Autoscaler resolve essa questão ao replicar os pods conforme a demanda, 
+prevenindo falhas e garantindo a disponibilidade contínua do serviço.</p>
+
+![Captura de Tela 2024-01-09 às 8.58.22 PM.png](img%2FCaptura%20de%20Tela%202024-01-09%20%C3%A0s%208.58.22%20PM.png)
+
+![Captura de Tela 2024-01-09 às 8.59.06 PM.png](img%2FCaptura%20de%20Tela%202024-01-09%20%C3%A0s%208.59.06%20PM.png)
+
+<p>O Horizontal Pod Autoescaler é um recurso capaz de, automaticamente, escalar o número de Pods em um Deployment, em um ReplicaSet, em um StatefulSet, 
+baseado na observação da CPU</p>
+
+* Aplicando o autoscaler no news-portal-deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: news-portal-deployment
+spec:
+  template:
+    metadata:
+      name: news-portal
+      labels:
+        app: news-portal
+    spec:
+      containers:
+        - name: news-portal-container
+          image: aluracursos/portal-noticias:1
+          ports:
+            - containerPort: 80
+          envFrom:
+            - configMapRef:
+                name: portal-configmap
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 10
+            failureThreshold: 3
+            initialDelaySeconds: 20
+          resources:
+            requests:
+              cpu: 10m
+              memory: 128Mi
+  replicas: 3
+  selector:
+    matchLabels:
+      app: news-portal
+```
+
+* Aplicando a inclusão do autoscaler
+
+```shell
+kubectl apply -f .\news-portal-deployment.yaml
+```
+
+* Criando autoscaler
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: news-portal-hpa
+spec:
+    scaleTargetRef:
+        apiVersion: apps/v1
+        kind: Deployment
+        name: news-portal-deployment
+    minReplicas: 1
+    maxReplicas: 10
+    metrics:
+        - type: Resource
+          resource:
+            name: cpu
+            target:
+                type: Utilization
+                averageUtilization: 50
+```
+
+* Aplicando o autoscaler
+
+```shell
+kubectl apply -f .\news-portal-hpa.yaml
+```
+
+* Consultando o autoscaler
+
+```shell
+~ autoscaler % kubectl get hpa
+NAME              REFERENCE                           TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+news-portal-hpa   Deployment/news-portal-deployment   <unknown>/50%   1         10        3          36s
+```
+
+* o target do hpa está como unknown porque ele nao conseguiu pegar as métricas do servidor, podemos constar isso dando describe no news-portal-hpa
+
+<p>Nós podemos usar um Servidor de Métricas para definir, basear as nossas informações de consumo de CPU e memória para utilizar o Horizontal Pod 
+Autoescaler e, também, fazer esse ajuste de maneira automática, conforme recursos necessitados pelos containers.</p>
+
+<p>Necessário baixar as definições do servidor de métricas da versão através do link https://github.com/kubernetes-sigs/metrics-server/releases</p>
+
+<p>Se nao temos o objetivo de fazer verificaçao de certifcado tls, podemos desabilitar no windows no arquivo de definiçao components.yaml</p>
+
+````yaml
+    - args:
+        - --cert-dir=/tmp
+        - --secure-port=4443
+        - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+        - --kubelet-use-node-status-port
+        - --metric-resolution=15s
+        - --kubelet-insecure-tls
+````
+
+* Aplicando o metrics-server
+
+```shell
+kubectl apply -f .\components.yaml
+```
+* Mesmo assim o hpa ainda nao reconhece as métricas do metrics server, para isso é necessário aguardar tempo para que ele reconheça as métricas.
+
+* Para sobrecarregar o pod diversas requisiçoes iremos fazer um teste de stress
+* O bash recebe um parametro que é o intervalo entre as requisicoes, no caso 0.001 segundos e o output para ver a saída do stress
+
+```shell
+sh stress.sh 0.001 > output.txt
+```
+
+* Pode ser usado o Git Bash caso nao tenha como rodar o .sh. Podemos usar mais de uma aba do terminal para fazer mais requisições
+
+* Se consultarmos o hpa, veremos que ele está quase no limite de 50% de uso de cpu
+
+```shell
+kubectl get hpa --watch
+```
+
+* Se consultarmos o pod, veremos que ele criou mais um pod para atender a demanda
+
+```shell
+kubectl get pods
+```
+
+* Quando a demanda cessar, ele voltará para um pod, conforme a demanda que diminuiu
+
+#### No Linux
+
+<p>No linux o minikube possui o metrics-server, basta fazer a habilitá-lo do mesmo.</p>
+
+````shell
+minikube addons enable metrics-server
+````
+
+* No Linux também demora para fazer sicronizaçao das métricas com hpa, necessário aguardar
+
+* Para fazer o teste de stress no linux, é necessário colocar o IP do minikube no lugar do localhost
+
+```shell
+vim stress.sh
+
+#!/bin/bash
+for i in {1..10000}; do
+  curl 192.168.49.2:30000
+  sleep $1
+done
+~                                                                                                                                                                                                                                
+~                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+~                                                                                                                                                                                                                                
+-- INSERT --
+
+```
+* tecla A para editar o arquivo, para salvar e sair ESC e depois :wq
+
+* Para descobrir o IP internal, basta fazer o comando a seguir:
+
+```shell
+~ kubernetes % kubectl get nodes -o wide
+NAME       STATUS   ROLES           AGE    VERSION   INTERNAL-IP    EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION   CONTAINER-RUNTIME
+minikube   Ready    control-plane   168d   v1.27.3   192.168.49.2   <none>        Ubuntu 22.04.2 LTS   6.1.32-0-virt    docker://24.0.4
+```
+
+* Para rodar o teste de stress, basta fazer o comando a seguir:
+
+```shell
+bash stress.sh 0.001 > out.txt
+```
